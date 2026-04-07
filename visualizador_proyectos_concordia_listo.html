@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tablero de Proyectos</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root{
+      --accent:#743BBC;
+      --accent-2:#8f5ad3;
+      --accent-soft:#f2ebfc;
+      --bg:#f7f5fb;
+      --surface:#ffffff;
+      --surface-2:#faf7ff;
+      --text:#20162d;
+      --muted:#6d627b;
+      --border:#e7def4;
+      --good:#1f9d68;
+      --warn:#d99000;
+      --bad:#c23b3b;
+      --shadow:0 10px 28px rgba(116,59,188,.10);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:linear-gradient(180deg,#faf8fe 0%,#f5f2fb 100%);
+      color:var(--text);
+    }
+    .wrap{max-width:1380px;margin:0 auto;padding:24px}
+    .hero{
+      background:linear-gradient(135deg,var(--accent) 0%, #5c2fa0 100%);
+      color:#fff;border-radius:24px;padding:28px 30px;box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+    .hero h1{margin:0 0 10px;font-size:34px;line-height:1.05}
+    .hero p{margin:0;max-width:860px;color:rgba(255,255,255,.88);font-size:15px}
+    .hero small{display:block;margin-top:12px;color:rgba(255,255,255,.78)}
+    .grid-kpi{
+      display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:18px
+    }
+    .card{
+      background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+      box-shadow:var(--shadow)
+    }
+    .kpi{padding:18px}
+    .kpi .label{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .kpi .value{font-size:34px;font-weight:800;line-height:1;color:var(--accent)}
+    .kpi .sub{font-size:13px;color:var(--muted);margin-top:7px}
+    .filters{padding:18px;margin-bottom:18px}
+    .filters h2,.section-title{margin:0 0 14px;font-size:18px}
+    .filters-grid{
+      display:grid;grid-template-columns:2fr repeat(6,1fr);gap:12px
+    }
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600}
+    input[type="text"], select{
+      width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:12px;
+      background:#fff;font-size:14px;color:var(--text)
+    }
+    .btns{display:flex;gap:10px;align-items:end}
+    button{
+      padding:11px 14px;border:0;border-radius:12px;background:var(--accent);color:#fff;
+      font-weight:700;cursor:pointer
+    }
+    button.secondary{background:var(--accent-soft);color:var(--accent)}
+    .two-col{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-bottom:18px}
+    .panel{padding:18px}
+    .chart-wrap{height:300px}
+    .detail-empty{color:var(--muted);font-size:14px}
+    .project-title{font-size:22px;font-weight:800;line-height:1.2;margin:0 0 10px}
+    .desc{
+      background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;
+      font-size:15px;line-height:1.55;margin-bottom:14px
+    }
+    .meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .meta{
+      background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 12px
+    }
+    .meta .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:5px}
+    .meta .v{font-size:14px;font-weight:700}
+    .table-card{padding:14px}
+    .table-top{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:10px}
+    .table-top .hint{font-size:13px;color:var(--muted)}
+    .table-scroll{overflow:auto;border:1px solid var(--border);border-radius:14px}
+    table{width:100%;border-collapse:collapse;min-width:1220px;background:#fff}
+    th,td{padding:12px 10px;border-bottom:1px solid #efe8f9;vertical-align:top;text-align:left;font-size:13px}
+    th{background:#fbf9fe;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0}
+    tr:hover{background:#fcfaff}
+    .pill{
+      display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;
+      background:var(--accent-soft);color:var(--accent);white-space:nowrap
+    }
+    .priority-alta{background:#efe6fc;color:#5d28a7}
+    .priority-media{background:#fff2d8;color:#9f6b00}
+    .priority-baja{background:#e8f7ef;color:#1f8b5d}
+    .state-terminado{background:#e8f7ef;color:#1f8b5d}
+    .state-construccion{background:#fff2d8;color:#9f6b00}
+    .state-otro{background:#f1ecf8;color:#6d627b}
+    .desc-cell{max-width:340px;color:#4c4060}
+    .muted{color:var(--muted)}
+    .footer-note{margin-top:10px;font-size:12px;color:var(--muted)}
+    @media (max-width:1200px){
+      .grid-kpi{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .filters-grid{grid-template-columns:1fr 1fr 1fr}
+      .two-col{grid-template-columns:1fr}
+    }
+    @media (max-width:760px){
+      .grid-kpi{grid-template-columns:1fr 1fr}
+      .filters-grid{grid-template-columns:1fr}
+      .hero h1{font-size:28px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Tablero de proyectos</h1>
+      <p>Seguimiento de proyectos con filtros, estados, prioridades y detalle rápido. La tabla se actualiza leyendo directamente un CSV publicado desde Google Sheets.</p>
+      <small id="lastUpdate">Esperando datos…</small>
+    </section>
+
+    <section class="grid-kpi" id="kpis"></section>
+
+    <section class="card filters">
+      <h2>Filtros</h2>
+      <div class="filters-grid">
+        <div>
+          <label>Buscar</label>
+          <input id="searchText" type="text" placeholder="Proyecto, descripción, observaciones..." />
+        </div>
+        <div>
+          <label>Tipo</label>
+          <select id="tipoFilter"></select>
+        </div>
+        <div>
+          <label>Paquete / Eje</label>
+          <select id="ejeFilter"></select>
+        </div>
+        <div>
+          <label>Estado de redacción</label>
+          <select id="redaccionFilter"></select>
+        </div>
+        <div>
+          <label>Estado legislativo</label>
+          <select id="legislativoFilter"></select>
+        </div>
+        <div>
+          <label>Prioridad</label>
+          <select id="prioridadFilter"></select>
+        </div>
+        <div class="btns">
+          <button id="resetBtn" class="secondary">Limpiar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="two-col">
+      <div class="card panel">
+        <h2 class="section-title">Distribución de proyectos</h2>
+        <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div class="card panel" id="detailPanel">
+        <h2 class="section-title">Detalle rápido</h2>
+        <div class="detail-empty">Hacé clic en una fila para ver la descripción breve, estado, prioridad y observaciones del proyecto.</div>
+      </div>
+    </section>
+
+    <section class="two-col">
+      <div class="card panel">
+        <h2 class="section-title">Proyectos por eje</h2>
+        <div class="chart-wrap"><canvas id="axisChart"></canvas></div>
+      </div>
+      <div class="card panel">
+        <h2 class="section-title">Prioridades</h2>
+        <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card table-card">
+      <div class="table-top">
+        <h2 class="section-title" style="margin:0">Listado de proyectos</h2>
+        <div class="hint" id="rowCount"></div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Proyecto</th>
+              <th>Descripción breve</th>
+              <th>Tipo</th>
+              <th>Paquete / Eje</th>
+              <th>Estado de redacción</th>
+              <th>Fecha objetivo</th>
+              <th>Estado legislativo</th>
+              <th>Comisión</th>
+              <th>Último movimiento</th>
+              <th>Prioridad</th>
+              <th>Resultado</th>
+              <th>Observaciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="footer-note">Sugerencia: si una fila queda corrida o vacía en la hoja, el tablero la va a mostrar pero conviene corregirla en Sheets. En los datos que mandaste hay al menos una fila final con el proyecto vacío y solo descripción. </div>
+    </section>
+  </div>
+
+<script>
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTZQlMd-B483Wwtt5CIB0l3FByMmpuR9HWG00VH4Yf9vNl44C5OT3a7a_Tfdk58w8dwws9eDNKFOn_u/pub?gid=112451633&single=true&output=csv';
+const REFRESH_MS = 5 * 60 * 1000;
+let rawData = [];
+let filteredData = [];
+let charts = {};
+let selectedProjectKey = null;
+
+const accent = '#743BBC';
+const accentSoft = '#f2ebfc';
+
+const el = id => document.getElementById(id);
+
+function clean(v){
+  return (v ?? '').toString().replace(/\s+/g,' ').trim();
+}
+function norm(v){ return clean(v).toLowerCase(); }
+
+function optionize(values, placeholder='Todos'){
+  return [`<option value="">${placeholder}</option>`]
+    .concat([...values].sort((a,b)=>a.localeCompare(b,'es')).map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`))
+    .join('');
+}
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+
+function parseCSV(text){
+  const result = Papa.parse(text, {header:true, skipEmptyLines:true});
+  return result.data.map((r, idx) => ({
+    id: idx + 1,
+    proyecto: clean(r['Proyecto']),
+    descripcion: clean(r['Descripción']),
+    tipo: clean(r['Tipo']),
+    eje: clean(r['Paquete/Eje']),
+    redaccion: clean(r['Estado de Redacción']),
+    fechaObjetivo: clean(r['Fecha Objetivo de Presentación']),
+    legislativo: clean(r['Estado Legislativo']),
+    comision: clean(r['Comisión Asignada']),
+    movimiento: clean(r['Último Movimiento']),
+    prioridad: clean(r['Prioridad']),
+    resultado: clean(r['Resultado Final']),
+    observaciones: clean(r['Observaciones']),
+    searchable: [
+      r['Proyecto'], r['Descripción'], r['Paquete/Eje'], r['Estado de Redacción'],
+      r['Estado Legislativo'], r['Comisión Asignada'], r['Prioridad'], r['Observaciones']
+    ].map(clean).join(' | ').toLowerCase()
+  }));
+}
+
+async function loadData(){
+  if (CSV_URL === 'PEGAR_AQUI_LINK_CSV') {
+    alert('Primero pegá tu link CSV en la constante CSV_URL dentro del archivo HTML.');
+    return;
+  }
+  const cacheBuster = (CSV_URL.includes('?') ? '&' : '?') + '_ts=' + Date.now();
+  const res = await fetch(CSV_URL + cacheBuster);
+  const text = await res.text();
+  rawData = parseCSV(text);
+  buildFilters(rawData);
+  applyFilters();
+  el('lastUpdate').textContent = 'Última carga: ' + new Date().toLocaleString('es-AR');
+}
+
+function uniqueVals(field){
+  return new Set(rawData.map(r => r[field]).filter(Boolean));
+}
+
+function buildFilters(){
+  el('tipoFilter').innerHTML = optionize(uniqueVals('tipo'));
+  el('ejeFilter').innerHTML = optionize(uniqueVals('eje'));
+  el('redaccionFilter').innerHTML = optionize(uniqueVals('redaccion'));
+  el('legislativoFilter').innerHTML = optionize(uniqueVals('legislativo'));
+  el('prioridadFilter').innerHTML = optionize(uniqueVals('prioridad'));
+}
+
+function applyFilters(){
+  const search = norm(el('searchText').value);
+  const tipo = clean(el('tipoFilter').value);
+  const eje = clean(el('ejeFilter').value);
+  const redaccion = clean(el('redaccionFilter').value);
+  const legislativo = clean(el('legislativoFilter').value);
+  const prioridad = clean(el('prioridadFilter').value);
+
+  filteredData = rawData.filter(r => {
+    return (!search || r.searchable.includes(search)) &&
+           (!tipo || r.tipo === tipo) &&
+           (!eje || r.eje === eje) &&
+           (!redaccion || r.redaccion === redaccion) &&
+           (!legislativo || r.legislativo === legislativo) &&
+           (!prioridad || r.prioridad === prioridad);
+  });
+
+  renderKpis();
+  renderCharts();
+  renderTable();
+  renderDetailFromSelection();
+  el('rowCount').textContent = `${filteredData.length} proyecto(s) visibles`;
+}
+
+function renderKpis(){
+  const total = filteredData.length;
+  const terminados = filteredData.filter(r => norm(r.redaccion)==='terminado').length;
+  const enConstruccion = filteredData.filter(r => norm(r.redaccion).includes('constru')).length;
+  const altas = filteredData.filter(r => norm(r.prioridad)==='alta').length;
+  const enTrat = filteredData.filter(r => ['en tratamiento','en comisión','tratado'].includes(norm(r.legislativo))).length;
+
+  const items = [
+    ['Total de proyectos', total, 'Base filtrada actual'],
+    ['Terminados', terminados, 'Estado de redacción'],
+    ['En construcción', enConstruccion, 'Estado de redacción'],
+    ['Prioridad alta', altas, 'Marcados como alta'],
+    ['Con movimiento legislativo', enTrat, 'Tratado / comisión / tratamiento'],
+  ];
+
+  el('kpis').innerHTML = items.map(([label,val,sub]) => `
+    <div class="card kpi">
+      <div class="label">${escapeHtml(label)}</div>
+      <div class="value">${escapeHtml(val)}</div>
+      <div class="sub">${escapeHtml(sub)}</div>
+    </div>
+  `).join('');
+}
+
+function countBy(field){
+  const map = new Map();
+  filteredData.forEach(r => {
+    const key = clean(r[field]) || 'Sin dato';
+    map.set(key, (map.get(key) || 0) + 1);
+  });
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]);
+}
+
+function upsertChart(name, config){
+  if (charts[name]) charts[name].destroy();
+  charts[name] = new Chart(document.getElementById(name), config);
+}
+
+function renderCharts(){
+  const byStatus = countBy('redaccion');
+  upsertChart('statusChart', {
+    type:'bar',
+    data:{
+      labels: byStatus.map(x=>x[0]),
+      datasets:[{
+        data: byStatus.map(x=>x[1]),
+        backgroundColor: [accent, '#8f5ad3', '#c9b3ed', '#e7def8', '#d7c5f4'],
+        borderRadius: 8
+      }]
+    },
+    options:{
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}, ticks:{color:'#6d627b'}},
+        y:{beginAtZero:true, ticks:{precision:0,color:'#6d627b'}}
+      }
+    }
+  });
+
+  const byAxis = countBy('eje').slice(0,10);
+  upsertChart('axisChart', {
+    type:'bar',
+    data:{
+      labels: byAxis.map(x=>x[0]),
+      datasets:[{
+        data: byAxis.map(x=>x[1]),
+        backgroundColor: accent,
+        borderRadius: 8
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{beginAtZero:true, ticks:{precision:0,color:'#6d627b'}},
+        y:{grid:{display:false}, ticks:{color:'#6d627b'}}
+      }
+    }
+  });
+
+  const byPrio = countBy('prioridad');
+  upsertChart('priorityChart', {
+    type:'doughnut',
+    data:{
+      labels: byPrio.map(x=>x[0]),
+      datasets:[{
+        data: byPrio.map(x=>x[1]),
+        backgroundColor: ['#743BBC','#c19a00','#1f9d68','#cab6ea','#e8defa'],
+        borderColor:'#fff',
+        borderWidth:2
+      }]
+    },
+    options:{
+      maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{color:'#6d627b'}}}
+    }
+  });
+}
+
+function badgePriority(val){
+  const n = norm(val);
+  if(n==='alta') return 'priority-alta';
+  if(n==='media') return 'priority-media';
+  if(n==='baja') return 'priority-baja';
+  return '';
+}
+function badgeRedaccion(val){
+  const n = norm(val);
+  if(n==='terminado') return 'state-terminado';
+  if(n.includes('constru')) return 'state-construccion';
+  return 'state-otro';
+}
+
+function projectKey(r){
+  return [r.proyecto, r.descripcion].join('||');
+}
+
+function renderTable(){
+  const tbody = el('tableBody');
+  tbody.innerHTML = filteredData.map(r => `
+    <tr data-key="${escapeHtml(projectKey(r))}">
+      <td><strong>${escapeHtml(r.proyecto || 'Sin título')}</strong></td>
+      <td class="desc-cell">${escapeHtml(r.descripcion || '—')}</td>
+      <td>${escapeHtml(r.tipo || '—')}</td>
+      <td>${escapeHtml(r.eje || '—')}</td>
+      <td><span class="pill ${badgeRedaccion(r.redaccion)}">${escapeHtml(r.redaccion || 'Sin dato')}</span></td>
+      <td>${escapeHtml(r.fechaObjetivo || '—')}</td>
+      <td>${escapeHtml(r.legislativo || '—')}</td>
+      <td>${escapeHtml(r.comision || '—')}</td>
+      <td>${escapeHtml(r.movimiento || '—')}</td>
+      <td><span class="pill ${badgePriority(r.prioridad)}">${escapeHtml(r.prioridad || '—')}</span></td>
+      <td>${escapeHtml(r.resultado || '—')}</td>
+      <td>${escapeHtml(r.observaciones || '—')}</td>
+    </tr>
+  `).join('');
+
+  [...tbody.querySelectorAll('tr')].forEach(tr => {
+    tr.addEventListener('click', () => {
+      selectedProjectKey = tr.dataset.key;
+      renderDetailFromSelection();
+    });
+  });
+}
+
+function renderDetailFromSelection(){
+  const panel = el('detailPanel');
+  let item = filteredData.find(r => projectKey(r) === selectedProjectKey) || filteredData[0];
+
+  if(!item){
+    panel.innerHTML = `<h2 class="section-title">Detalle rápido</h2><div class="detail-empty">No hay proyectos para mostrar con los filtros actuales.</div>`;
+    return;
+  }
+  selectedProjectKey = projectKey(item);
+  panel.innerHTML = `
+    <h2 class="section-title">Detalle rápido</h2>
+    <div class="project-title">${escapeHtml(item.proyecto || 'Sin título')}</div>
+    <div class="desc">${escapeHtml(item.descripcion || 'Sin descripción breve')}</div>
+    <div class="meta-grid">
+      <div class="meta"><div class="k">Tipo</div><div class="v">${escapeHtml(item.tipo || '—')}</div></div>
+      <div class="meta"><div class="k">Paquete / Eje</div><div class="v">${escapeHtml(item.eje || '—')}</div></div>
+      <div class="meta"><div class="k">Estado de redacción</div><div class="v">${escapeHtml(item.redaccion || '—')}</div></div>
+      <div class="meta"><div class="k">Estado legislativo</div><div class="v">${escapeHtml(item.legislativo || '—')}</div></div>
+      <div class="meta"><div class="k">Prioridad</div><div class="v">${escapeHtml(item.prioridad || '—')}</div></div>
+      <div class="meta"><div class="k">Fecha objetivo</div><div class="v">${escapeHtml(item.fechaObjetivo || '—')}</div></div>
+      <div class="meta"><div class="k">Comisión</div><div class="v">${escapeHtml(item.comision || '—')}</div></div>
+      <div class="meta"><div class="k">Último movimiento</div><div class="v">${escapeHtml(item.movimiento || '—')}</div></div>
+    </div>
+    <div class="meta" style="margin-top:10px">
+      <div class="k">Observaciones</div>
+      <div class="v muted" style="font-weight:600">${escapeHtml(item.observaciones || '—')}</div>
+    </div>
+  `;
+}
+
+function bindEvents(){
+  ['searchText','tipoFilter','ejeFilter','redaccionFilter','legislativoFilter','prioridadFilter']
+    .forEach(id => el(id).addEventListener(id==='searchText'?'input':'change', applyFilters));
+  el('resetBtn').addEventListener('click', () => {
+    ['searchText','tipoFilter','ejeFilter','redaccionFilter','legislativoFilter','prioridadFilter'].forEach(id => el(id).value = '');
+    applyFilters();
+  });
+}
+
+bindEvents();
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>
