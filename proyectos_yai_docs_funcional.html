@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Estado legislativo de proyectos</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root{
+      --accent:#743BBC;
+      --accent-2:#8f5ad3;
+      --accent-3:#5a2f96;
+      --accent-soft:#f2ebfc;
+      --accent-softer:#f8f4fd;
+      --bg:#f7f5fb;
+      --surface:#ffffff;
+      --surface-2:#faf7ff;
+      --text:#20162d;
+      --muted:#6d627b;
+      --border:#e7def4;
+      --good:#1f9d68;
+      --warn:#d99000;
+      --bad:#c23b3b;
+      --shadow:0 14px 34px rgba(116,59,188,.11);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:linear-gradient(180deg,#faf8fe 0%,#f5f2fb 100%);
+      color:var(--text);
+    }
+    .wrap{max-width:1400px;margin:0 auto;padding:22px}
+    .brand-strip{
+      display:flex;align-items:center;justify-content:space-between;gap:18px;
+      margin-bottom:14px;color:var(--muted);font-size:13px
+    }
+    .brand-left{display:flex;align-items:center;gap:12px}
+    .brand-mark{
+      width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-3));
+      display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;box-shadow:var(--shadow)
+    }
+    .brand-text strong{display:block;color:var(--text);font-size:14px}
+    .hero{
+      position:relative;overflow:hidden;
+      background:linear-gradient(135deg,var(--accent) 0%, #5c2fa0 55%, #4a267f 100%);
+      color:#fff;border-radius:28px;padding:0;box-shadow:var(--shadow);margin-bottom:20px;
+    }
+    .hero-grid{
+      display:grid;grid-template-columns:1.1fr .9fr;min-height:290px
+    }
+    .hero-copy{padding:30px 30px 26px;position:relative;z-index:2}
+    .eyebrow{
+      display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;
+      background:rgba(255,255,255,.13);backdrop-filter:blur(4px);font-size:12px;font-weight:700;letter-spacing:.03em
+    }
+    .hero h1{margin:14px 0 12px;font-size:40px;line-height:1.02;max-width:700px}
+    .hero p{margin:0;max-width:720px;color:rgba(255,255,255,.92);font-size:15px;line-height:1.6}
+    .hero small{display:block;margin-top:14px;color:rgba(255,255,255,.8);font-size:13px}
+    .hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+    .chip{
+      display:inline-flex;align-items:center;gap:8px;padding:10px 13px;border-radius:999px;
+      background:rgba(255,255,255,.14);font-size:12px;font-weight:700;color:#fff;border:1px solid rgba(255,255,255,.18)
+    }
+    .hero-visual{
+      position:relative;min-height:260px;display:flex;align-items:flex-end;justify-content:flex-end;padding:18px 18px 0 18px
+    }
+    .visual-card{
+      width:min(100%,530px);height:100%;min-height:260px;border-left:1px solid rgba(255,255,255,.12);
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+      position:relative
+    }
+    .visual-label{
+      position:absolute;right:18px;top:18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);
+      padding:8px 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase
+    }
+    .silhouette-wrap{
+      position:absolute;left:0;right:0;bottom:0;height:100%;
+      display:flex;align-items:flex-end;justify-content:center;opacity:.95
+    }
+    .silhouette-wrap svg{width:100%;height:100%}
+    .hero-fade{
+      position:absolute;inset:auto 0 0 0;height:120px;
+      background:linear-gradient(180deg,rgba(255,255,255,0),rgba(18,8,31,.25))
+    }
+    .grid-kpi{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-bottom:18px}
+    .card{
+      background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)
+    }
+    .kpi{padding:18px}
+    .kpi .label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-weight:700}
+    .kpi .value{font-size:34px;font-weight:800;line-height:1;color:var(--accent)}
+    .kpi .sub{font-size:13px;color:var(--muted);margin-top:7px}
+    .filters{padding:18px;margin-bottom:18px}
+    .filters-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}
+    .filters h2,.section-title{margin:0;font-size:18px}
+    .filters-sub{font-size:13px;color:var(--muted);margin-top:6px}
+    .filters-grid{display:grid;grid-template-columns:2.2fr repeat(6,1fr);gap:12px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:700}
+    input[type="text"], select{
+      width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:12px;
+      background:#fff;font-size:14px;color:var(--text)
+    }
+    .btns{display:flex;gap:10px;align-items:end}
+    button{
+      padding:11px 14px;border:0;border-radius:12px;background:var(--accent);color:#fff;
+      font-weight:800;cursor:pointer;transition:.18s transform ease,.18s opacity ease,.18s background ease
+    }
+    button:hover{transform:translateY(-1px)}
+    button.secondary{background:var(--accent-soft);color:var(--accent)}
+    button.ghost{background:#fff;color:var(--accent);border:1px solid var(--border)}
+    .layout-main{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;margin-bottom:18px}
+    .layout-charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+    .panel{padding:18px}
+    .chart-wrap{height:300px}
+    .detail-head{display:flex;justify-content:space-between;gap:12px;align-items:start;margin-bottom:12px}
+    .detail-empty{color:var(--muted);font-size:14px}
+    .project-title{font-size:24px;font-weight:900;line-height:1.15;margin:0 0 10px}
+    .project-subline{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+    .desc{
+      background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;
+      font-size:15px;line-height:1.6;margin-bottom:14px
+    }
+    .action-box{
+      border:1px solid var(--border);background:linear-gradient(180deg,#fcfaff,#fff);border-radius:14px;padding:14px 16px;margin-bottom:12px
+    }
+    .action-box .title{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .action-box .body{font-size:14px;line-height:1.5}
+    .meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .meta{background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 12px}
+    .meta .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:5px;font-weight:800}
+    .meta .v{font-size:14px;font-weight:700}
+    .board-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+    .mini-list{display:flex;flex-direction:column;gap:10px}
+    .mini-item{
+      background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 13px
+    }
+    .mini-item strong{display:block;font-size:14px;margin-bottom:6px}
+    .mini-item p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+    .table-card{padding:14px}
+    .table-top{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:10px}
+    .table-top .hint{font-size:13px;color:var(--muted)}
+    .table-scroll{overflow:auto;border:1px solid var(--border);border-radius:14px}
+    table{width:100%;border-collapse:collapse;min-width:1280px;background:#fff}
+    th,td{padding:12px 10px;border-bottom:1px solid #efe8f9;vertical-align:top;text-align:left;font-size:13px}
+    th{background:#fbf9fe;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0}
+    tr:hover{background:#fcfaff}
+    tr.is-selected{background:#f7f1fe}
+    .pill{
+      display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;
+      background:var(--accent-soft);color:var(--accent);white-space:nowrap
+    }
+    .priority-alta{background:#efe6fc;color:#5d28a7}
+    .priority-media{background:#fff2d8;color:#9f6b00}
+    .priority-baja{background:#e8f7ef;color:#1f8b5d}
+    .state-terminado{background:#e8f7ef;color:#1f8b5d}
+    .state-construccion{background:#fff2d8;color:#9f6b00}
+    .state-otro{background:#f1ecf8;color:#6d627b}
+    .health-verde{background:#e8f7ef;color:#1f8b5d}
+    .health-amarillo{background:#fff2d8;color:#9f6b00}
+    .health-rojo{background:#fde8e8;color:#b23838}
+    .desc-cell{max-width:340px;color:#4c4060}
+    .muted{color:var(--muted)}
+    .cards-grid{
+      display:none;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:14px;margin-top:8px
+    }
+    .project-card{
+      background:#fff;border:1px solid var(--border);border-radius:16px;padding:15px;box-shadow:var(--shadow)
+    }
+    .project-card h3{margin:0 0 10px;font-size:17px;line-height:1.25}
+    .project-card p{margin:0 0 12px;color:var(--muted);font-size:14px;line-height:1.55}
+    .card-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+    .card-meta div{background:var(--accent-softer);border-radius:12px;padding:9px 10px}
+    .card-meta strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:5px}
+    .footer-note{margin-top:10px;font-size:12px;color:var(--muted)}
+
+    .doc-link,.doc-btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      text-decoration:none;font-weight:700;border-radius:10px;transition:all .15s ease;
+    }
+    .doc-link{
+      padding:7px 10px;background:var(--accent-soft);color:var(--accent);border:1px solid #dcccf5;
+      font-size:12px;white-space:nowrap;
+    }
+    .doc-link:hover,.doc-btn:hover{transform:translateY(-1px);filter:brightness(.98)}
+    .doc-link.missing{background:#f4f1f8;color:var(--muted);border-color:var(--border);pointer-events:none}
+    .doc-btn{margin-top:12px;padding:12px 14px;background:var(--accent);color:#fff;border:0;font-size:14px}
+
+    .print-only{display:none}
+    @media (max-width:1250px){
+      .grid-kpi{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .filters-grid{grid-template-columns:repeat(3,1fr)}
+      .layout-main{grid-template-columns:1fr}
+      .layout-charts{grid-template-columns:1fr}
+      .board-grid{grid-template-columns:1fr}
+      .hero-grid{grid-template-columns:1fr}
+      .hero-visual{min-height:220px}
+      .visual-card{border-left:0;border-top:1px solid rgba(255,255,255,.12)}
+    }
+    @media (max-width:780px){
+      .wrap{padding:14px}
+      .brand-strip{flex-direction:column;align-items:flex-start}
+      .hero-copy{padding:22px 20px 20px}
+      .hero h1{font-size:30px}
+      .grid-kpi{grid-template-columns:1fr 1fr}
+      .filters-grid{grid-template-columns:1fr}
+      .filters-head{flex-direction:column}
+      .meta-grid{grid-template-columns:1fr}
+      .table-scroll{display:none}
+      .cards-grid{display:grid}
+      .hero-actions{display:none}
+      .project-title{font-size:20px}
+    }
+    @media (max-width:520px){
+      .grid-kpi{grid-template-columns:1fr}
+      .cards-grid{grid-template-columns:1fr}
+      .eyebrow{font-size:11px}
+      .hero h1{font-size:26px}
+    }
+    @media print{
+      body{background:#fff}
+      .brand-strip,.hero,.filters,.layout-main > :first-child,.layout-charts,.board-grid,.table-card,.grid-kpi{display:none !important}
+      .wrap{max-width:none;padding:0}
+      .layout-main{display:block}
+      #detailPanel{
+        display:block !important;
+        box-shadow:none;border:none;padding:0
+      }
+      .print-only{display:block;margin-bottom:16px}
+      .detail-head button{display:none !important}
+      .desc,.action-box,.meta,.card{box-shadow:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand-strip">
+      <div class="brand-left">
+        <div class="brand-mark">Y</div>
+        <div class="brand-text">
+          <strong>Estado Legislativo · Yaiza</strong>
+          <span>Seguimiento estratégico de proyectos y agenda legislativa</span>
+        </div>
+      </div>
+      <div class="muted">Concordia · tablero vivo conectado a Google Sheets</div>
+    </div>
+
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">Seguimiento estratégico · Concordia</span>
+          <h1>Estado legislativo de proyectos</h1>
+          <p>Tablero para ver rápidamente qué proyectos están listos, cuáles requieren empuje político, cuáles siguen en construcción y qué conviene mover ahora. El diseño incorpora una identidad visual propia y una silueta estilizada inspirada en Concordia, su frente costero y el perfil urbano asociado a la ciudad.</p>
+          <div class="hero-actions">
+            <span class="chip">Prioridades</span>
+            <span class="chip">Estado legislativo</span>
+            <span class="chip">Detalle rápido</span>
+            <span class="chip">Fichas imprimibles</span>
+          </div>
+          <small id="lastUpdate">Esperando datos…</small>
+        </div>
+        <div class="hero-visual">
+          <div class="visual-card">
+            <div class="visual-label">Concordia · silueta</div>
+            <div class="silhouette-wrap" aria-hidden="true">
+              <svg viewBox="0 0 800 400" preserveAspectRatio="xMidYMax meet">
+                <defs>
+                  <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="rgba(255,255,255,.34)"/>
+                    <stop offset="100%" stop-color="rgba(255,255,255,.08)"/>
+                  </linearGradient>
+                  <linearGradient id="river" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="rgba(255,255,255,.16)"/>
+                    <stop offset="100%" stop-color="rgba(255,255,255,.03)"/>
+                  </linearGradient>
+                </defs>
+                <rect x="0" y="0" width="800" height="400" fill="transparent"/>
+                <circle cx="640" cy="84" r="38" fill="rgba(255,255,255,.12)"/>
+                <path d="M0 290 Q70 286 120 278 T220 275 T320 268 T430 276 T560 270 T690 282 T800 275 L800 400 L0 400 Z" fill="url(#river)"/>
+                <path d="M0 258 L42 258 L42 232 L58 232 L58 258 L84 258 L84 190 L104 190 L104 258 L130 258 L130 224 L144 224 L144 258 L170 258 L170 212 L190 212 L190 258 L222 258 L222 176 L252 176 L252 258 L272 258 L272 204 L300 204 L300 258 L330 258 L330 166 L362 166 L362 258 L390 258 L390 216 L410 216 L410 258 L446 258 L446 182 L480 182 L480 258 L510 258 L510 198 L538 198 L538 258 L570 258 L570 154 L612 154 L612 258 L638 258 L638 224 L660 224 L660 258 L698 258 L698 194 L728 194 L728 258 L800 258 L800 400 L0 400 Z" fill="url(#g1)"/>
+                <path d="M95 232 L95 176 L104 168 L113 176 L113 232" fill="rgba(255,255,255,.18)"/>
+                <path d="M348 166 L348 120 L362 108 L376 120 L376 166" fill="rgba(255,255,255,.18)"/>
+                <path d="M602 154 L602 102 L612 90 L622 102 L622 154" fill="rgba(255,255,255,.18)"/>
+                <path d="M0 248 C85 240 130 196 194 198 C232 199 264 225 302 225 C348 225 380 182 426 182 C472 182 510 214 556 214 C614 214 650 155 712 155 C746 155 773 173 800 186" fill="none" stroke="rgba(255,255,255,.24)" stroke-width="6" stroke-linecap="round"/>
+                <path d="M120 206 L180 206 M248 229 L302 229 M390 190 L446 190 M560 204 L618 204" stroke="rgba(255,255,255,.12)" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="hero-fade"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-kpi" id="kpis"></section>
+
+    <section class="card filters">
+      <div class="filters-head">
+        <div>
+          <h2>Filtros</h2>
+          <div class="filters-sub">Podés combinar filtros por eje, prioridad, estado y texto libre. El tablero recalcula todo en el momento.</div>
+        </div>
+      </div>
+      <div class="filters-grid">
+        <div>
+          <label>Buscar</label>
+          <input id="searchText" type="text" placeholder="Proyecto, descripción, observaciones..." />
+        </div>
+        <div>
+          <label>Tipo</label>
+          <select id="tipoFilter"></select>
+        </div>
+        <div>
+          <label>Paquete / Eje</label>
+          <select id="ejeFilter"></select>
+        </div>
+        <div>
+          <label>Estado de redacción</label>
+          <select id="redaccionFilter"></select>
+        </div>
+        <div>
+          <label>Estado legislativo</label>
+          <select id="legislativoFilter"></select>
+        </div>
+        <div>
+          <label>Prioridad</label>
+          <select id="prioridadFilter"></select>
+        </div>
+        <div class="btns">
+          <button id="resetBtn" class="secondary">Limpiar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="layout-main">
+      <div class="card panel">
+        <h2 class="section-title">Distribución de proyectos</h2>
+        <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div class="card panel" id="detailPanel">
+        <div class="print-only">
+          <h1 style="margin:0 0 6px;color:#000">Ficha de proyecto</h1>
+          <div style="font-size:13px;color:#444">Estado Legislativo · Yaiza</div>
+        </div>
+        <div class="detail-head">
+          <h2 class="section-title">Detalle rápido</h2>
+          <button id="printProjectBtn" class="ghost">Imprimir ficha</button>
+        </div>
+        <div class="detail-empty">Hacé clic en una fila o tarjeta para ver la descripción breve, estado, prioridad y observaciones del proyecto.</div>
+      </div>
+    </section>
+
+    <section class="layout-charts">
+      <div class="card panel">
+        <h2 class="section-title">Proyectos por eje</h2>
+        <div class="chart-wrap"><canvas id="axisChart"></canvas></div>
+      </div>
+      <div class="card panel">
+        <h2 class="section-title">Prioridades</h2>
+        <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="board-grid">
+      <div class="card panel">
+        <h2 class="section-title">Qué mover ahora</h2>
+        <div class="mini-list" id="moveNowList"></div>
+      </div>
+      <div class="card panel">
+        <h2 class="section-title">Alertas de cartera</h2>
+        <div class="mini-list" id="alertsList"></div>
+      </div>
+    </section>
+
+    <section class="card table-card">
+      <div class="table-top">
+        <h2 class="section-title" style="margin:0">Listado de proyectos</h2>
+        <div class="hint" id="rowCount"></div>
+      </div>
+      <div class="cards-grid" id="cardsGrid"></div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Proyecto</th>
+              <th>Descripción breve</th>
+              <th>Tipo</th>
+              <th>Paquete / Eje</th>
+              <th>Salud</th>
+              <th>Estado de redacción</th>
+              <th>Fecha objetivo</th>
+              <th>Estado legislativo</th>
+              <th>Comisión</th>
+              <th>Último movimiento</th>
+              <th>Prioridad</th>
+              <th>Resultado</th>
+              <th>Observaciones</th>
+              <th>Documento</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="footer-note">Sugerencia: si una fila queda corrida o vacía en la hoja, el tablero la va a mostrar pero conviene corregirla en Sheets.</div>
+    </section>
+  </div>
+
+<script>
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTZQlMd-B483Wwtt5CIB0l3FByMmpuR9HWG00VH4Yf9vNl44C5OT3a7a_Tfdk58w8dwws9eDNKFOn_u/pub?gid=112451633&single=true&output=csv';
+const REFRESH_MS = 5 * 60 * 1000;
+let rawData = [];
+let filteredData = [];
+let charts = {};
+let selectedProjectKey = null;
+
+const accent = '#743BBC';
+
+const el = id => document.getElementById(id);
+
+function clean(v){ return (v ?? '').toString().replace(/\s+/g,' ').trim(); }
+function norm(v){ return clean(v).toLowerCase(); }
+function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+
+function optionize(values, placeholder='Todos'){
+  return [`<option value="">${placeholder}</option>`]
+    .concat([...values].sort((a,b)=>a.localeCompare(b,'es')).map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`))
+    .join('');
+}
+
+function parseCSV(text){
+  const result = Papa.parse(text, {header:true, skipEmptyLines:true});
+
+  function normalizeHeader(s){
+    return clean(s)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase();
+  }
+
+  function pick(row, ...keys){
+    const entries = Object.entries(row || {});
+    const normalizedMap = new Map(entries.map(([k,v]) => [normalizeHeader(k), v]));
+    for (const key of keys){
+      const v = normalizedMap.get(normalizeHeader(key));
+      if (v !== undefined && clean(v) !== '') return clean(v);
+    }
+    return '';
+  }
+
+  return result.data.map((r, idx) => ({
+    id: idx + 1,
+    proyecto: pick(r, 'Proyecto'),
+    descripcion: pick(r, 'Descripción', 'Descripcion'),
+    tipo: pick(r, 'Tipo'),
+    eje: pick(r, 'Paquete/Eje', 'Paquete / Eje'),
+    redaccion: pick(r, 'Estado de Redacción', 'Estado de Redaccion'),
+    fechaObjetivo: pick(r, 'Fecha Objetivo de Presentación', 'Fecha Objetivo de Presentacion', 'Fecha objetivo'),
+    legislativo: pick(r, 'Estado Legislativo'),
+    comision: pick(r, 'Comisión Asignada', 'Comision Asignada', 'Comisión', 'Comision'),
+    movimiento: pick(r, 'Último Movimiento', 'Ultimo Movimiento'),
+    prioridad: pick(r, 'Prioridad'),
+    resultado: pick(r, 'Resultado Final', 'Resultado'),
+    observaciones: pick(r, 'Observaciones'),
+    linkDoc: pick(r, 'Documento', 'Link Doc', 'Link Docs', 'Doc', 'Google Doc', 'URL Documento', 'URL Doc'),
+    searchable: [
+      pick(r, 'Proyecto'),
+      pick(r, 'Descripción', 'Descripcion'),
+      pick(r, 'Paquete/Eje', 'Paquete / Eje'),
+      pick(r, 'Estado de Redacción', 'Estado de Redaccion'),
+      pick(r, 'Estado Legislativo'),
+      pick(r, 'Comisión Asignada', 'Comision Asignada', 'Comisión', 'Comision'),
+      pick(r, 'Prioridad'),
+      pick(r, 'Observaciones'),
+      pick(r, 'Último Movimiento', 'Ultimo Movimiento'),
+      pick(r, 'Documento', 'Link Doc', 'Link Docs', 'Doc', 'Google Doc')
+    ].filter(Boolean).join(' | ').toLowerCase()
+  })).filter(r => r.proyecto || r.descripcion || r.eje || r.redaccion || r.legislativo || r.linkDoc);
+}
+
+async function loadData(){
+  const cacheBuster = (CSV_URL.includes('?') ? '&' : '?') + '_ts=' + Date.now();
+  const res = await fetch(CSV_URL + cacheBuster);
+  const text = await res.text();
+  rawData = parseCSV(text);
+  buildFilters(rawData);
+  applyFilters();
+  el('lastUpdate').textContent = 'Última carga: ' + new Date().toLocaleString('es-AR');
+}
+
+function uniqueVals(field){ return new Set(rawData.map(r => r[field]).filter(Boolean)); }
+
+function buildFilters(){
+  el('tipoFilter').innerHTML = optionize(uniqueVals('tipo'));
+  el('ejeFilter').innerHTML = optionize(uniqueVals('eje'));
+  el('redaccionFilter').innerHTML = optionize(uniqueVals('redaccion'));
+  el('legislativoFilter').innerHTML = optionize(uniqueVals('legislativo'));
+  el('prioridadFilter').innerHTML = optionize(uniqueVals('prioridad'));
+}
+
+function projectKey(r){ return [r.proyecto, r.descripcion, r.eje].join('||'); }
+
+function inferHealth(r){
+  const red = norm(r.redaccion);
+  const leg = norm(r.legislativo);
+  const obs = norm(r.observaciones);
+  if (obs.includes('cajoneado') || obs.includes('trabar') || obs.includes('traccionar') || obs.includes('movilizarlo')) return 'rojo';
+  if (red === 'terminado' && ['en tratamiento','en comisión','tratado'].includes(leg)) return 'verde';
+  if (red === 'terminado' && leg === 'no presentado') return 'amarillo';
+  if (red.includes('constru')) return 'amarillo';
+  return 'amarillo';
+}
+function healthLabel(v){
+  if(v==='verde') return 'En movimiento';
+  if(v==='rojo') return 'Trabado';
+  return 'A seguir';
+}
+function healthClass(v){
+  if(v==='verde') return 'health-verde';
+  if(v==='rojo') return 'health-rojo';
+  return 'health-amarillo';
+}
+function nextAction(r){
+  const leg = norm(r.legislativo);
+  const red = norm(r.redaccion);
+  const obs = clean(r.observaciones);
+  if (obs) return obs;
+  if (red === 'terminado' && leg === 'no presentado') return 'Definir ventana política y preparar presentación.';
+  if (red.includes('constru')) return 'Cerrar redacción y fijar fecha de trabajo.';
+  if (['en tratamiento','en comisión','tratado'].includes(leg)) return 'Seguir comisión, aliados y próximos movimientos.';
+  return 'Revisar prioridad, estado y ruta de acción.';
+}
+
+function applyFilters(){
+  const search = norm(el('searchText').value);
+  const tipo = clean(el('tipoFilter').value);
+  const eje = clean(el('ejeFilter').value);
+  const redaccion = clean(el('redaccionFilter').value);
+  const legislativo = clean(el('legislativoFilter').value);
+  const prioridad = clean(el('prioridadFilter').value);
+
+  filteredData = rawData.filter(r => {
+    return (!search || r.searchable.includes(search)) &&
+           (!tipo || r.tipo === tipo) &&
+           (!eje || r.eje === eje) &&
+           (!redaccion || r.redaccion === redaccion) &&
+           (!legislativo || r.legislativo === legislativo) &&
+           (!prioridad || r.prioridad === prioridad);
+  });
+
+  renderKpis();
+  renderCharts();
+  renderBoardInsights();
+  renderTable();
+  renderCards();
+  renderDetailFromSelection();
+  el('rowCount').textContent = `${filteredData.length} proyecto(s) visibles`;
+}
+
+function renderKpis(){
+  const total = filteredData.length;
+  const terminados = filteredData.filter(r => norm(r.redaccion)==='terminado').length;
+  const enConstruccion = filteredData.filter(r => norm(r.redaccion).includes('constru')).length;
+  const alta = filteredData.filter(r => norm(r.prioridad)==='alta').length;
+  const enTrat = filteredData.filter(r => ['en tratamiento','en comisión','tratado'].includes(norm(r.legislativo))).length;
+  const listos = filteredData.filter(r => norm(r.redaccion)==='terminado' && norm(r.legislativo)==='no presentado').length;
+
+  const items = [
+    ['Total', total, 'Base filtrada actual'],
+    ['Terminados', terminados, 'Estado de redacción'],
+    ['En construcción', enConstruccion, 'Redacción pendiente'],
+    ['Prioridad alta', alta, 'Marcados como alta'],
+    ['Con movimiento', enTrat, 'Comisión / tratamiento'],
+    ['Listos para presentar', listos, 'Terminados + no presentados'],
+  ];
+
+  el('kpis').innerHTML = items.map(([label,val,sub]) => `
+    <div class="card kpi">
+      <div class="label">${escapeHtml(label)}</div>
+      <div class="value">${escapeHtml(val)}</div>
+      <div class="sub">${escapeHtml(sub)}</div>
+    </div>
+  `).join('');
+}
+
+function countBy(field){
+  const map = new Map();
+  filteredData.forEach(r => {
+    const key = clean(r[field]) || 'Sin dato';
+    map.set(key, (map.get(key) || 0) + 1);
+  });
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]);
+}
+function upsertChart(name, config){
+  if (charts[name]) charts[name].destroy();
+  charts[name] = new Chart(document.getElementById(name), config);
+}
+
+function renderCharts(){
+  const byStatus = countBy('redaccion');
+  upsertChart('statusChart', {
+    type:'bar',
+    data:{
+      labels: byStatus.map(x=>x[0]),
+      datasets:[{
+        data: byStatus.map(x=>x[1]),
+        backgroundColor: [accent, '#8f5ad3', '#c9b3ed', '#e7def8', '#d7c5f4'],
+        borderRadius: 10
+      }]
+    },
+    options:{
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}, ticks:{color:'#6d627b'}},
+        y:{beginAtZero:true, ticks:{precision:0,color:'#6d627b'}}
+      }
+    }
+  });
+
+  const byAxis = countBy('eje').slice(0,10);
+  upsertChart('axisChart', {
+    type:'bar',
+    data:{
+      labels: byAxis.map(x=>x[0]),
+      datasets:[{
+        data: byAxis.map(x=>x[1]),
+        backgroundColor: accent,
+        borderRadius: 10
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{beginAtZero:true, ticks:{precision:0,color:'#6d627b'}},
+        y:{grid:{display:false}, ticks:{color:'#6d627b'}}
+      }
+    }
+  });
+
+  const byPrio = countBy('prioridad');
+  upsertChart('priorityChart', {
+    type:'doughnut',
+    data:{
+      labels: byPrio.map(x=>x[0]),
+      datasets:[{
+        data: byPrio.map(x=>x[1]),
+        backgroundColor: ['#743BBC','#c19a00','#1f9d68','#cab6ea','#e8defa'],
+        borderColor:'#fff',
+        borderWidth:2
+      }]
+    },
+    options:{
+      maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{color:'#6d627b'}}}
+    }
+  });
+}
+
+function renderBoardInsights(){
+  const move = filteredData
+    .filter(r => norm(r.prioridad)==='alta' || norm(r.legislativo)==='en tratamiento' || norm(r.observaciones))
+    .sort((a,b) => {
+      const score = x => (norm(x.prioridad)==='alta'?3:0) + (norm(x.redaccion)==='terminado'?2:0) + (norm(x.legislativo)==='en tratamiento'?2:0) + (clean(x.observaciones)?1:0);
+      return score(b)-score(a);
+    })
+    .slice(0,5);
+
+  const alerts = [
+    {
+      title:'Terminados sin presentar',
+      body:`${filteredData.filter(r => norm(r.redaccion)==='terminado' && norm(r.legislativo)==='no presentado').length} proyecto(s) pueden pasar a agenda política.`
+    },
+    {
+      title:'Con observaciones tácticas',
+      body:`${filteredData.filter(r => clean(r.observaciones)).length} proyecto(s) tienen notas operativas útiles para seguimiento.`
+    },
+    {
+      title:'En comisión o tratamiento',
+      body:`${filteredData.filter(r => ['en comisión','en tratamiento','tratado'].includes(norm(r.legislativo))).length} proyecto(s) requieren seguimiento legislativo fino.`
+    }
+  ];
+
+  el('moveNowList').innerHTML = move.length ? move.map(r => `
+    <div class="mini-item">
+      <strong>${escapeHtml(r.proyecto || 'Sin título')}</strong>
+      <p>${escapeHtml(nextAction(r))}</p>
+    </div>
+  `).join('') : `<div class="mini-item"><strong>Sin elementos</strong><p>No hay proyectos destacados con los filtros actuales.</p></div>`;
+
+  el('alertsList').innerHTML = alerts.map(a => `
+    <div class="mini-item">
+      <strong>${escapeHtml(a.title)}</strong>
+      <p>${escapeHtml(a.body)}</p>
+    </div>
+  `).join('');
+}
+
+function badgePriority(val){
+  const n = norm(val);
+  if(n==='alta') return 'priority-alta';
+  if(n==='media') return 'priority-media';
+  if(n==='baja') return 'priority-baja';
+  return '';
+}
+function badgeRedaccion(val){
+  const n = norm(val);
+  if(n==='terminado') return 'state-terminado';
+  if(n.includes('constru')) return 'state-construccion';
+  return 'state-otro';
+}
+
+function renderTable(){
+  const tbody = el('tableBody');
+  tbody.innerHTML = filteredData.map(r => `
+    <tr data-key="${escapeHtml(projectKey(r))}" class="${selectedProjectKey===projectKey(r)?'is-selected':''}">
+      <td><strong>${escapeHtml(r.proyecto || 'Sin título')}</strong></td>
+      <td class="desc-cell">${escapeHtml(r.descripcion || '—')}</td>
+      <td>${escapeHtml(r.tipo || '—')}</td>
+      <td>${escapeHtml(r.eje || '—')}</td>
+      <td><span class="pill ${healthClass(inferHealth(r))}">${escapeHtml(healthLabel(inferHealth(r)))}</span></td>
+      <td><span class="pill ${badgeRedaccion(r.redaccion)}">${escapeHtml(r.redaccion || 'Sin dato')}</span></td>
+      <td>${escapeHtml(r.fechaObjetivo || '—')}</td>
+      <td>${escapeHtml(r.legislativo || '—')}</td>
+      <td>${escapeHtml(r.comision || '—')}</td>
+      <td>${escapeHtml(r.movimiento || '—')}</td>
+      <td><span class="pill ${badgePriority(r.prioridad)}">${escapeHtml(r.prioridad || '—')}</span></td>
+      <td>${escapeHtml(r.resultado || '—')}</td>
+      <td>${escapeHtml(r.observaciones || '—')}</td>
+      <td>${r.linkDoc ? `<a class="doc-link" href="${escapeHtml(r.linkDoc)}" target="_blank" rel="noopener noreferrer">Abrir doc</a>` : `<span class="doc-link missing">Sin doc</span>`}</td>
+    </tr>
+  `).join('');
+
+  [...tbody.querySelectorAll('tr')].forEach(tr => {
+    tr.addEventListener('click', () => {
+      selectedProjectKey = tr.dataset.key;
+      renderTable();
+      renderCards();
+      renderDetailFromSelection();
+      window.scrollTo({top: 0, behavior:'smooth'});
+    });
+  });
+}
+
+function renderCards(){
+  const grid = el('cardsGrid');
+  grid.innerHTML = filteredData.map(r => `
+    <article class="project-card" data-key="${escapeHtml(projectKey(r))}">
+      <div class="project-subline">
+        <span class="pill ${healthClass(inferHealth(r))}">${escapeHtml(healthLabel(inferHealth(r)))}</span>
+        <span class="pill ${badgePriority(r.prioridad)}">${escapeHtml(r.prioridad || '—')}</span>
+      </div>
+      <h3>${escapeHtml(r.proyecto || 'Sin título')}</h3>
+      <p>${escapeHtml(r.descripcion || 'Sin descripción breve')}</p>
+      <div class="card-meta">
+        <div><strong>Estado</strong>${escapeHtml(r.redaccion || '—')}</div>
+        <div><strong>Legislativo</strong>${escapeHtml(r.legislativo || '—')}</div>
+        <div><strong>Eje</strong>${escapeHtml(r.eje || '—')}</div>
+        <div><strong>Acción</strong>${escapeHtml(nextAction(r))}</div>
+      </div>
+    </article>
+  `).join('');
+
+  [...grid.querySelectorAll('.project-card')].forEach(card => {
+    card.addEventListener('click', () => {
+      selectedProjectKey = card.dataset.key;
+      renderDetailFromSelection();
+      window.scrollTo({top: 0, behavior:'smooth'});
+    });
+  });
+}
+
+function renderDetailFromSelection(){
+  const panel = el('detailPanel');
+  let item = filteredData.find(r => projectKey(r) === selectedProjectKey) || filteredData[0];
+  if(!item){
+    panel.innerHTML = `
+      <div class="detail-head">
+        <h2 class="section-title">Detalle rápido</h2>
+        <button id="printProjectBtn" class="ghost">Imprimir ficha</button>
+      </div>
+      <div class="detail-empty">No hay proyectos para mostrar con los filtros actuales.</div>`;
+    bindPrint();
+    return;
+  }
+  selectedProjectKey = projectKey(item);
+  panel.innerHTML = `
+    <div class="print-only">
+      <h1 style="margin:0 0 6px;color:#000">Ficha de proyecto</h1>
+      <div style="font-size:13px;color:#444">Estado Legislativo · Yaiza</div>
+    </div>
+    <div class="detail-head">
+      <h2 class="section-title">Detalle rápido</h2>
+      <button id="printProjectBtn" class="ghost">Imprimir ficha</button>
+    </div>
+    <div class="project-title">${escapeHtml(item.proyecto || 'Sin título')}</div>
+    <div class="project-subline">
+      <span class="pill ${healthClass(inferHealth(item))}">${escapeHtml(healthLabel(inferHealth(item)))}</span>
+      <span class="pill ${badgePriority(item.prioridad)}">${escapeHtml(item.prioridad || '—')}</span>
+      <span class="pill ${badgeRedaccion(item.redaccion)}">${escapeHtml(item.redaccion || '—')}</span>
+    </div>
+    <div class="desc">${escapeHtml(item.descripcion || 'Sin descripción breve')}</div>
+    <div class="action-box">
+      <div class="title">Próxima acción sugerida</div>
+      <div class="body">${escapeHtml(nextAction(item))}</div>
+    </div>
+    <div class="meta-grid">
+      <div class="meta"><div class="k">Tipo</div><div class="v">${escapeHtml(item.tipo || '—')}</div></div>
+      <div class="meta"><div class="k">Paquete / Eje</div><div class="v">${escapeHtml(item.eje || '—')}</div></div>
+      <div class="meta"><div class="k">Estado legislativo</div><div class="v">${escapeHtml(item.legislativo || '—')}</div></div>
+      <div class="meta"><div class="k">Fecha objetivo</div><div class="v">${escapeHtml(item.fechaObjetivo || '—')}</div></div>
+      <div class="meta"><div class="k">Comisión</div><div class="v">${escapeHtml(item.comision || '—')}</div></div>
+      <div class="meta"><div class="k">Último movimiento</div><div class="v">${escapeHtml(item.movimiento || '—')}</div></div>
+    </div>
+    <div class="meta" style="margin-top:10px">
+      <div class="k">Observaciones</div>
+      <div class="v muted" style="font-weight:600">${escapeHtml(item.observaciones || '—')}</div>
+    </div>
+    ${item.linkDoc ? `<a class="doc-btn" href="${escapeHtml(item.linkDoc)}" target="_blank" rel="noopener noreferrer">Abrir documento del proyecto</a>` : ''}
+  `;
+  bindPrint();
+}
+function bindPrint(){
+  const btn = el('printProjectBtn');
+  if(btn) btn.addEventListener('click', () => window.print());
+}
+
+function bindEvents(){
+  ['searchText','tipoFilter','ejeFilter','redaccionFilter','legislativoFilter','prioridadFilter']
+    .forEach(id => el(id).addEventListener(id==='searchText'?'input':'change', applyFilters));
+  el('resetBtn').addEventListener('click', () => {
+    ['searchText','tipoFilter','ejeFilter','redaccionFilter','legislativoFilter','prioridadFilter'].forEach(id => el(id).value = '');
+    applyFilters();
+  });
+}
+
+bindEvents();
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>
